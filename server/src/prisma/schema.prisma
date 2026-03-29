@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String   @id @default(uuid())
+  openid             String   @unique @map("openid")
+  userType           String   @default("student") @map("user_type")
+  nickname           String?
+  avatar             String?
+  grade              Int?
+  subjects           String[]
+  examDate           DateTime? @map("exam_date")
+  membershipLevel    String   @default("free") @map("membership_level")
+  membershipExpireAt DateTime? @map("membership_expire_at")
+  parentOpenid       String?  @map("parent_openid")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  wrongQuestions     WrongQuestion[]
+  dailyPlans        DailyPlan[]
+  studyRecords      StudyRecord[]
+
+  @@map("users")
+}
+
+model WrongQuestion {
+  id            String   @id @default(uuid())
+  openid        String   @map("openid")
+  questionImage String?  @map("question_image")
+  questionText  String?  @map("question_text")
+  subject       String?
+  knowledgePoint String? @map("knowledge_point")
+  wrongCount    Int      @default(1) @map("wrong_count")
+  correctCount  Int      @default(0) @map("correct_count")
+  status        String   @default("unmastered")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user          User     @relation(fields: [openid], references: [openid])
+  explanations  Explanation[]
+
+  @@index([openid])
+  @@index([subject])
+  @@index([status])
+  @@map("wrong_questions")
+}
+
+model Explanation {
+  id            String   @id @default(uuid())
+  questionId    String   @map("question_id")
+  doubt         String
+  explanation   String
+  isUnderstood  Boolean? @map("is_understood")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  question      WrongQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("explanations")
+}
+
+model DailyPlan {
+  id           String   @id @default(uuid())
+  openid       String   @map("openid")
+  planDate     DateTime @map("plan_date")
+  items        Json     @default("[]")
+  tomatoCount  Int      @default(0) @map("tomato_count")
+  totalMinutes Int      @default(0) @map("total_minutes")
+  summary      String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user         User     @relation(fields: [openid], references: [openid])
+
+  @@unique([openid, planDate])
+  @@index([openid])
+  @@index([planDate])
+  @@map("daily_plans")
+}
+
+model StudyRecord {
+  id            String   @id @default(uuid())
+  openid        String   @map("openid")
+  recordDate    DateTime @map("record_date")
+  records       Json     @default("[]")
+  emotionStatus String?  @map("emotion_status")
+  emotionNote   String?  @map("emotion_note")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user          User     @relation(fields: [openid], references: [openid])
+
+  @@unique([openid, recordDate])
+  @@index([openid])
+  @@map("study_records")
+}
+
+model ParentChildRelation {
+  id               String   @id @default(uuid())
+  parentOpenid     String   @map("parent_openid")
+  childOpenid      String   @map("child_openid")
+  relation         String?
+  bindCode         String?  @map("bind_code")
+  bindCodeExpireAt DateTime? @map("bind_code_expire_at")
+  notifyEnabled    Boolean  @default(true) @map("notify_enabled")
+  weeklyReportDay  Int      @default(6) @map("weekly_report_day")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@unique([parentOpenid, childOpenid])
+  @@index([parentOpenid])
+  @@index([childOpenid])
+  @@index([bindCode])
+  @@map("parent_child_relations")
+}
