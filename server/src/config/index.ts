@@ -17,6 +17,10 @@ export const config = {
     apiKey: process.env.OPENAI_API_KEY || '',
     baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
   },
+  google: {
+    apiKey: process.env.GOOGLE_API_KEY || '',
+    baseURL: process.env.GOOGLE_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/models',
+  },
   database: {
     url: process.env.DATABASE_URL || 'postgresql://localhost:5432/study_agent',
   },

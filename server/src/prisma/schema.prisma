@@ -25,6 +25,8 @@ model User {
   wrongQuestions     WrongQuestion[]
   dailyPlans        DailyPlan[]
   studyRecords      StudyRecord[]
+  chatHistories     ChatHistory[]
+  chatMessages       ChatMessage[]
 
   @@map("users")
 }
@@ -115,4 +117,39 @@ model ParentChildRelation {
   @@index([childOpenid])
   @@index([bindCode])
   @@map("parent_child_relations")
+}
+
+model ChatHistory {
+  id           String   @id @default(uuid())
+  openid       String   @map("openid")
+  sessionDate  DateTime @map("session_date")
+  summary      String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user         User     @relation(fields: [openid], references: [openid])
+  messages     ChatMessage[]
+
+  @@unique([openid, sessionDate])
+  @@index([openid])
+  @@index([sessionDate])
+  @@map("chat_histories")
+}
+
+model ChatMessage {
+  id           String   @id @default(uuid())
+  openid       String   @map("openid")
+  historyId    String?  @map("history_id")
+  role         String   // user / assistant / system
+  content      String
+  messageType  String   @default("general") @map("message_type")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user         User     @relation(fields: [openid], references: [openid])
+  history      ChatHistory? @relation(fields: [historyId], references: [id], onDelete: Cascade)
+
+  @@index([openid])
+  @@index([historyId])
+  @@index([createdAt])
+  @@map("chat_messages")
 }

@@ -4,6 +4,7 @@ import { userService } from './user.js';
 import { studyService } from './study.js';
 import { buildPlannerPrompt } from '../prompts/planner.js';
 import { nanoid } from 'nanoid';
+import { logger } from '../utils/logger.js';
 
 export interface PlanItem {
   id: string;
@@ -53,7 +54,12 @@ export class PlannerService {
     };
   }
 
-  async generateTodayPlan(openid: string, focusSubjects?: string[], availableMinutes: number = 120): Promise<DailyPlan> {
+  async generateTodayPlan(
+    openid: string,
+    focusSubjects?: string[],
+    availableMinutes: number = 120,
+    customGoal?: string
+  ): Promise<DailyPlan> {
     const user = await userService.getUserByOpenid(openid);
     if (!user) {
       throw new Error('User not found');
@@ -61,30 +67,34 @@ export class PlannerService {
 
     const weakPoints = await studyService.getWeakPoints(openid);
 
-    const prompt = buildPlannerPrompt(
-      user.grade || 1,
-      user.subjects || ['math'],
-      weakPoints,
-      availableMinutes
-    );
-
-    const result = await aiService.chat([
-      { role: 'user', content: prompt },
-    ]);
-
     let items: PlanItem[] = [];
+
     try {
-      const jsonMatch = result.reply.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        items = parsed.items || [];
+      const prompt = buildPlannerPrompt(
+        user.grade || 1,
+        user.subjects || ['数学', '语文', '英语'],
+        weakPoints,
+        availableMinutes,
+        customGoal
+      );
+
+      const result = await aiService.chat([
+        { role: 'user', content: prompt },
+      ]);
+
+      if (result.reply && !result.reply.includes('抱歉，AI服务暂时未配置')) {
+        const jsonMatch = result.reply.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          items = parsed.items || [];
+        }
       }
-    } catch {
-      items = this.createDefaultPlanItems(weakPoints);
+    } catch (error) {
+      logger.warn('AI plan generation failed, using default', { error });
     }
 
     if (items.length === 0) {
-      items = this.createDefaultPlanItems(weakPoints);
+      items = this.createDefaultPlanItems(weakPoints, customGoal);
     }
 
     const today = new Date();
@@ -119,10 +129,25 @@ export class PlannerService {
     };
   }
 
-  private createDefaultPlanItems(weakPoints: { knowledgePoint: string; subject: string; count: number }[]): PlanItem[] {
+  private createDefaultPlanItems(
+    weakPoints: { knowledgePoint: string; subject: string; count: number }[],
+    customGoal?: string
+  ): PlanItem[] {
     const items: PlanItem[] = [];
-    const topWeak = weakPoints.slice(0, 3);
 
+    if (customGoal) {
+      items.push({
+        id: nanoid(),
+        type: 'practice',
+        title: customGoal,
+        subject: '用户指定',
+        targetCount: 1,
+        completedCount: 0,
+        status: 'pending',
+      });
+    }
+
+    const topWeak = weakPoints.slice(0, 3);
     for (let i = 0; i < topWeak.length; i++) {
       items.push({
         id: nanoid(),
@@ -204,12 +229,20 @@ export class PlannerService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const plan = await prisma.dailyPlan.findFirst({
+    let plan = await prisma.dailyPlan.findFirst({
       where: { openid, planDate: today },
     });
 
     if (!plan) {
-      return { totalTomatoesToday: 0, totalMinutesToday: 0 };
+      plan = await prisma.dailyPlan.create({
+        data: {
+          openid,
+          planDate: today,
+          items: [],
+          tomatoCount: 0,
+          totalMinutes: 0,
+        },
+      });
     }
 
     const minutes = result === 'completed' ? 25 : Math.floor(Math.random() * 10);

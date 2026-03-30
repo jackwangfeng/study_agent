@@ -6,9 +6,11 @@ import planRouter from './plan.js';
 import emotionalRouter from './emotional.js';
 import parentRouter from './parent.js';
 import memberRouter from './member.js';
+import authRouter from './auth.js';
 
 const router = Router();
 
+router.use('/auth', authRouter);
 router.use('/users', userRouter);
 router.use('/questions', questionRouter);
 router.use('/ai', aiRouter);

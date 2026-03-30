@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { aiService } from '../../services/ai.js';
 import { studyService } from '../../services/study.js';
-import { userService } from '../../services/user.js';
+import { chatHistoryService } from '../../services/chatHistory.js';
 
 const router = Router();
 
@@ -12,24 +12,19 @@ router.post('/chat', async (req, res) => {
       return res.status(401).json({ code: 401, message: 'Unauthorized' });
     }
 
-    const { message, context, type } = req.body;
+    const { message, type } = req.body;
 
-    const messages = [
-      ...(context || []).map((c: { role: string; content: string }) => ({
-        role: c.role as 'user' | 'assistant',
-        content: c.content,
-      })),
-      { role: 'user' as const, content: message },
-    ];
-
-    const result = await aiService.chat(messages);
+    const result = await aiService.chatWithHistory(openid, message, type);
 
     const detectedEmotion = detectEmotion(message);
 
     return res.json({
-      reply: result.reply,
-      detectedEmotion,
-      suggestedActions: getSuggestedActions(detectedEmotion),
+      code: 200,
+      data: {
+        reply: result.reply,
+        detectedEmotion,
+        suggestedActions: getSuggestedActions(detectedEmotion),
+      },
     });
   } catch (error) {
     console.error('Error in AI chat:', error);
@@ -55,7 +50,7 @@ router.post('/explain/:questionId', async (req, res) => {
 
     await studyService.addExplanation(questionId, doubt, result.explanation, result.isCompleted);
 
-    return res.json(result);
+    return res.json({ code: 200, data: result });
   } catch (error) {
     console.error('Error explaining question:', error);
     return res.status(500).json({ code: 500, message: 'Internal error' });
@@ -66,9 +61,39 @@ router.post('/extract-knowledge', async (req, res) => {
   try {
     const { question } = req.body;
     const knowledgePoint = await aiService.extractKnowledgePoint(question);
-    return res.json({ knowledgePoint });
+    return res.json({ code: 200, data: { knowledgePoint } });
   } catch (error) {
     console.error('Error extracting knowledge point:', error);
+    return res.status(500).json({ code: 500, message: 'Internal error' });
+  }
+});
+
+router.delete('/conversation', async (req, res) => {
+  try {
+    const openid = req.headers['x-wechat-openid'] as string;
+    if (!openid) {
+      return res.status(401).json({ code: 401, message: 'Unauthorized' });
+    }
+
+    await chatHistoryService.clearHistory(openid);
+    return res.json({ code: 200, message: 'Conversation cleared' });
+  } catch (error) {
+    console.error('Error clearing conversation:', error);
+    return res.status(500).json({ code: 500, message: 'Internal error' });
+  }
+});
+
+router.get('/history', async (req, res) => {
+  try {
+    const openid = req.headers['x-wechat-openid'] as string;
+    if (!openid) {
+      return res.status(401).json({ code: 401, message: 'Unauthorized' });
+    }
+
+    const history = await chatHistoryService.getHistorySummary(openid);
+    return res.json({ code: 200, data: { history } });
+  } catch (error) {
+    console.error('Error getting history:', error);
     return res.status(500).json({ code: 500, message: 'Internal error' });
   }
 });

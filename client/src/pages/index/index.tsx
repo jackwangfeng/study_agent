@@ -1,66 +1,32 @@
-import { View, Text, Button } from '@tarojs/components';
-import { useEffect, useState } from 'react';
-import { api } from '../../services/api';
+import { View, Text } from '@tarojs/components';
+import { useEffect } from 'react';
+import Taro from '@tarojs/taro';
+import { useStore } from '../../store';
 import './index.scss';
 
-interface UserInfo {
-  openid: string;
-  nickname?: string;
-  grade?: number;
-  membershipLevel: string;
-}
-
-interface TodayPlan {
-  id: string;
-  items: Array<{
-    id: string;
-    title: string;
-    subject: string;
-    status: string;
-    completedCount: number;
-    targetCount: number;
-  }>;
-  tomatoCount: number;
-  totalMinutes: number;
-}
+const GRADE_TEXT: Record<number, string> = {
+  1: '高一',
+  2: '高二',
+  3: '高三',
+};
 
 export default function Index() {
-  const [user, setUser] = useState<UserInfo | null>(null);
-  const [todayPlan, setTodayPlan] = useState<TodayPlan | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, todayPlan, fetchUser, fetchTodayPlan, generatePlan } = useStore();
 
   useEffect(() => {
-    loadData();
+    fetchUser();
+    fetchTodayPlan();
   }, []);
 
-  async function loadData() {
-    try {
-      const [userRes, planRes] = await Promise.all([
-        api.user.getMe(),
-        api.plan.getToday(),
-      ]);
-
-      if (userRes.data) {
-        setUser(userRes.data);
-      }
-      if (planRes.data) {
-        setTodayPlan(planRes.data);
-      }
-    } catch (error) {
-      console.error('Load data failed:', error);
-    } finally {
-      setLoading(false);
-    }
+  async function handleGeneratePlan() {
+    await generatePlan({ availableMinutes: 120 });
   }
 
-  async function handleGeneratePlan() {
-    try {
-      const res = await api.plan.generate();
-      if (res.data) {
-        setTodayPlan(res.data);
-      }
-    } catch (error) {
-      console.error('Generate plan failed:', error);
+  function handleNavigate(path: string) {
+    if (path.startsWith('/')) {
+      Taro.navigateTo({ url: path });
+    } else {
+      Taro.switchTab({ url: `/${path}` });
     }
   }
 
@@ -74,7 +40,7 @@ export default function Index() {
           你好，{user?.nickname || '同学'} 👋
         </View>
         <View className="header__subtitle">
-          {user?.grade ? `高一${user.grade === 1 ? '一' : user.grade === 2 ? '二' : '三'} · ` : ''}
+          {user?.grade ? `${GRADE_TEXT[user.grade] || ''} · ` : ''}
           {user?.membershipLevel === 'free' ? '免费版' : '会员'}
         </View>
       </View>
@@ -97,9 +63,9 @@ export default function Index() {
         </View>
 
         {!todayPlan ? (
-          <Button className="btn btn--primary btn--block" onClick={handleGeneratePlan}>
+          <View className="btn btn--primary btn--block" onClick={handleGeneratePlan}>
             生成今日计划
-          </Button>
+          </View>
         ) : (
           <View className="plan-list">
             {todayPlan.items?.slice(0, 3).map((item) => (
@@ -117,10 +83,10 @@ export default function Index() {
       <View className="card">
         <View className="card__title">快捷功能</View>
         <View className="grid grid--2">
-          <Button className="btn btn--secondary">📷 拍题</Button>
-          <Button className="btn btn--secondary">📅 计划</Button>
-          <Button className="btn btn--secondary">📚 错题本</Button>
-          <Button className="btn btn--secondary">💬 聊聊</Button>
+          <View className="btn btn--secondary" onClick={() => handleNavigate('pages/questions/index')}>📷 拍题</View>
+          <View className="btn btn--secondary" onClick={() => handleNavigate('pages/plan/index')}>📅 计划</View>
+          <View className="btn btn--secondary" onClick={() => handleNavigate('pages/questions/index')}>📚 错题本</View>
+          <View className="btn btn--secondary" onClick={() => handleNavigate('pages/chat/index')}>💬 聊聊</View>
         </View>
       </View>
 

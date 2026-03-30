@@ -502,6 +502,41 @@ CREATE INDEX idx_parent_child_child ON parent_child_relations(child_openid);
 CREATE INDEX idx_parent_child_bind_code ON parent_child_relations(bind_code);
 ```
 
+### 5.7 对话历史表 (chat_histories)
+
+```sql
+CREATE TABLE chat_histories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  openid VARCHAR(64) NOT NULL REFERENCES users(id),
+  session_date DATE NOT NULL,                -- 对话日期（用于聚合查询）
+  summary TEXT,                              -- AI生成的对话摘要
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(openid, session_date)
+);
+
+CREATE INDEX idx_chat_histories_openid ON chat_histories(openid);
+CREATE INDEX idx_chat_histories_date ON chat_histories(session_date);
+```
+
+### 5.8 对话消息表 (chat_messages)
+
+```sql
+CREATE TABLE chat_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  openid VARCHAR(64) NOT NULL REFERENCES users(id),
+  history_id UUID REFERENCES chat_histories(id),
+  role VARCHAR(20) NOT NULL,                 -- user/assistant/system
+  content TEXT NOT NULL,                      -- 消息内容
+  message_type VARCHAR(20) DEFAULT 'general', -- general/emotional/plan
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_chat_messages_openid ON chat_messages(openid);
+CREATE INDEX idx_chat_messages_history ON chat_messages(history_id);
+CREATE INDEX idx_chat_messages_created ON chat_messages(created_at);
+```
+
 ---
 
 ## 6. 第三方服务集成

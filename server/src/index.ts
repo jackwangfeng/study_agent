@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import xmlParser from 'express-xml-bodyparser';
 import { config } from './config/index.js';
 import { connectDatabase } from './prisma/index.js';
 import wechatRouter from './routes/wechat.js';
@@ -12,12 +11,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/wechat', xmlParser({
-  explicitArray: false,
-  ignoreAttrs: true,
-}));
 
 app.use('/api', apiRouter);
+
+app.use(
+  '/wechat',
+  express.text({ type: 'text/xml' }),
+  express.raw({ type: 'application/xml' })
+);
+
+app.use('/wechat', wechatRouter);
 
 app.get('/health', (_, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

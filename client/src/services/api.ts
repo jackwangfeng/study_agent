@@ -1,4 +1,4 @@
-const BASE_URL = process.env.TARO_APP_API_URL || 'http://localhost:3000';
+const BASE_URL = (typeof process !== 'undefined' && process.env && process.env.TARO_APP_API_URL) || 'http://localhost:3000';
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -12,9 +12,20 @@ interface ApiResponse<T = any> {
   data?: T;
 }
 
+function getMockOpenid(): string {
+  if (typeof localStorage !== 'undefined') {
+    return localStorage.getItem('mockOpenid') || '';
+  }
+  return '';
+}
+
 function getOpenid(): string {
   if (typeof wx !== 'undefined' && wx.getStorageSync) {
     return wx.getStorageSync('openid') || '';
+  }
+  const mockOpenid = getMockOpenid();
+  if (mockOpenid) {
+    return mockOpenid;
   }
   return '';
 }
@@ -64,6 +75,27 @@ export const api = {
 
   delete: <T = any>(endpoint: string, data?: any) =>
     request<T>(endpoint, { method: 'DELETE', data }),
+
+  auth: {
+    mockLogin: async () => {
+      const res = await api.post<any>('/api/auth/mock-login');
+      if (res.data?.mockOpenid && typeof localStorage !== 'undefined') {
+        localStorage.setItem('mockOpenid', res.data.mockOpenid);
+      }
+      return res;
+    },
+    isLoggedIn: () => {
+      if (typeof localStorage !== 'undefined') {
+        return !!localStorage.getItem('mockOpenid');
+      }
+      return false;
+    },
+    logout: () => {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('mockOpenid');
+      }
+    },
+  },
 
   user: {
     getMe: () => api.get<any>('/api/users/me'),

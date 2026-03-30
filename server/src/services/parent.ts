@@ -46,18 +46,28 @@ export class ParentService {
     const bindCode = nanoid(6).toUpperCase();
     const expireAt = new Date(Date.now() + 30 * 60 * 1000);
 
-    await prisma.parentChildRelation.upsert({
+    const existing = await prisma.parentChildRelation.findFirst({
       where: { childOpenid: openid },
-      update: {
-        bindCode,
-        bindCodeExpireAt: expireAt,
-      },
-      create: {
-        childOpenid: openid,
-        bindCode,
-        bindCodeExpireAt: expireAt,
-      },
     });
+
+    if (existing) {
+      await prisma.parentChildRelation.update({
+        where: { id: existing.id },
+        data: {
+          bindCode,
+          bindCodeExpireAt: expireAt,
+        },
+      });
+    } else {
+      await prisma.parentChildRelation.create({
+        data: {
+          childOpenid: openid,
+          parentOpenid: '',
+          bindCode,
+          bindCodeExpireAt: expireAt,
+        },
+      });
+    }
 
     return { bindCode, expireAt };
   }
